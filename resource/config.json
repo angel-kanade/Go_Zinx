@@ -1,0 +1,8 @@
+{
+  "Host": "127.0.0.1",
+  "TCPPort": 8888,
+  "Name": "kanade's server",
+  "Version": "tcp4",
+  "MaxConn": 1000,
+  "MaxPackageSize": 1024 
+}

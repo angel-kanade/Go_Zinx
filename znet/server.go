@@ -1,6 +1,7 @@
 package znet
 
 import (
+	"Go_Zinx/utils"
 	"Go_Zinx/zinterface"
 	"fmt"
 	"net"
@@ -74,12 +75,12 @@ func (s *Server) Stop() {
 
 }
 
-func NewServer(name string) zinterface.IServer {
+func NewServer() zinterface.IServer {
 	s := &Server{
-		Name:      name,
-		IPVersion: "tcp4",
-		IP:        "127.0.0.1",
-		Port:      8888,
+		Name:      utils.GlobalObject.Name,
+		IPVersion: utils.GlobalObject.Version,
+		IP:        utils.GlobalObject.Host,
+		Port:      utils.GlobalObject.TCPPort,
 		Handler:   nil,
 	}
 

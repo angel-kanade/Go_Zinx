@@ -1,6 +1,7 @@
 package znet
 
 import (
+	"Go_Zinx/utils"
 	"Go_Zinx/zinterface"
 	"fmt"
 	"net"
@@ -37,7 +38,7 @@ func (c *Connection) StartReader() {
 	fmt.Println("Reader Goroutine is running...")
 
 	for {
-		buf := make([]byte, 512)
+		buf := make([]byte, utils.GlobalObject.MaxPackageSize)
 
 		_, err := c.Conn.Read(buf)
 
