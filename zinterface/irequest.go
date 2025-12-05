@@ -3,5 +3,7 @@ package zinterface
 type IRequest interface {
 	GetConnection() IConnection
 
-	GetData() []byte
+	GetMsgData() []byte
+
+	GetMsgID() uint32
 }
