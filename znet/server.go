@@ -12,6 +12,15 @@ type Server struct {
 	IPVersion string
 	IP        string
 	Port      int
+
+	// 当前的Server注册的链接处理业务
+	Handler zinterface.IHandler
+}
+
+// Server添加一个Handler
+func (s *Server) AddHandler(handler zinterface.IHandler) {
+	s.Handler = handler
+	fmt.Println("Add Handler Success!")
 }
 
 func (s *Server) Start() {
@@ -43,7 +52,7 @@ func (s *Server) Start() {
 			}
 
 			cid++
-			dealConn := NewConnection(conn, cid, nil)
+			dealConn := NewConnection(conn, cid, s.Handler)
 
 			// 启动链接业务处理
 			go dealConn.Start()
@@ -71,6 +80,7 @@ func NewServer(name string) zinterface.IServer {
 		IPVersion: "tcp4",
 		IP:        "127.0.0.1",
 		Port:      8888,
+		Handler:   nil,
 	}
 
 	return s

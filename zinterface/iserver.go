@@ -8,4 +8,7 @@ type IServer interface {
 	Serve()
 	// 停止服务器
 	Stop()
+
+	// 路由功能：给当前的服务注册一个路由方法
+	AddHandler(router IHandler)
 }

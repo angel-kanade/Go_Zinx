@@ -13,20 +13,20 @@ type Connection struct {
 
 	isClosed bool
 
-	// 当前链接绑定的业务方法API
-	handleApi zinterface.HandleFunc
-
 	// 去告知链接已退出的channel
 	ExitChan chan bool
+
+	// 该链接处理的方法Router
+	Router zinterface.IHandler
 }
 
-func NewConnection(conn *net.TCPConn, connID uint32, callback_api zinterface.HandleFunc) *Connection {
+func NewConnection(conn *net.TCPConn, connID uint32, router zinterface.IHandler) *Connection {
 	c := &Connection{
-		Conn:      conn,
-		ConnID:    connID,
-		isClosed:  false,
-		handleApi: callback_api,
-		ExitChan:  make(chan bool, 1),
+		Conn:     conn,
+		ConnID:   connID,
+		isClosed: false,
+		ExitChan: make(chan bool, 1),
+		Router:   router,
 	}
 	return c
 }
@@ -39,18 +39,25 @@ func (c *Connection) StartReader() {
 	for {
 		buf := make([]byte, 512)
 
-		cnt, err := c.Conn.Read(buf)
+		_, err := c.Conn.Read(buf)
 
 		if err != nil {
 			fmt.Println("Receive buffer error", err)
 			continue
 		}
 
-		// 调用HandleAPi
-		if err = c.handleApi(c.Conn, buf, cnt); err != nil {
-			fmt.Println("ConnID", c.ConnID, "handle failed", err)
-			break
+		// 得到当前conn数据的Req
+		req := &Request{
+			conn: c,
+			data: buf,
 		}
+
+		// 从路由中，找到注册绑定的Conn对应的Router调用
+		go func(req zinterface.IRequest) {
+			c.Router.PreHandle(req)
+			c.Router.Handle(req)
+			c.Router.PostHandle(req)
+		}(req)
 	}
 
 }
@@ -90,5 +97,5 @@ func (c Connection) RemoteAddr() net.Addr {
 }
 
 func (c Connection) Send(data []byte) error {
-
+	return nil
 }

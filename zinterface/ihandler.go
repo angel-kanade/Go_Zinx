@@ -1,6 +1,6 @@
 package zinterface
 
-type IRouter interface {
+type IHandler interface {
 	// preHandle
 	PreHandle(request IRequest)
 	// handle
