@@ -32,18 +32,21 @@ func (s *Server) Start() {
 
 		fmt.Println("start Zinx Server success", s.Name, "Listening")
 
+		var cid uint32
+		cid = 0
 		// 3. 阻塞等待客户端连接，处理业务
 		for {
-			conn, err := listener.Accept()
+			conn, err := listener.AcceptTCP()
 			if err != nil {
 				fmt.Println("Accept Error", err)
 				continue
 			}
 
-			// 已经建立连接，开辟一个go协程，处理业务
-			go func() {
+			cid++
+			dealConn := NewConnection(conn, cid, nil)
 
-			}()
+			// 启动链接业务处理
+			go dealConn.Start()
 		}
 	}()
 
