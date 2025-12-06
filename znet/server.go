@@ -29,6 +29,9 @@ func (s *Server) Start() {
 
 	// 开辟一个 go 协程处理服务器启动，防止阻塞
 	go func() {
+		// 开启Worker工作池
+		s.msgRouter.StartWorkerPool()
+
 		// 1. 获取一个TCP的Addr:Port
 		addr, err := net.ResolveTCPAddr(s.IPVersion, fmt.Sprintf("%s:%d", s.IP, s.Port))
 		if err != nil {

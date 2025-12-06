@@ -8,13 +8,15 @@ import (
 
 // 存储配置参数类
 type GlobalObj struct {
-	TCPServer      zinterface.IServer
-	Host           string
-	TCPPort        int
-	Name           string
-	Version        string
-	MaxConn        int
-	MaxPackageSize uint32
+	TCPServer        zinterface.IServer
+	Host             string
+	TCPPort          int
+	Name             string
+	Version          string
+	MaxConn          int
+	MaxPackageSize   uint32
+	WorkerPoolSize   uint32
+	MaxWorkerTaskLen uint32
 }
 
 var GlobalObject *GlobalObj
@@ -33,13 +35,15 @@ func (g *GlobalObj) Reload() {
 func init() {
 	// 默认数值
 	GlobalObject = &GlobalObj{
-		TCPServer:      nil,
-		Host:           "127.0.0.1",
-		TCPPort:        8888,
-		Name:           "kanade's server",
-		Version:        "Latest",
-		MaxConn:        1000,
-		MaxPackageSize: 1024,
+		TCPServer:        nil,
+		Host:             "127.0.0.1",
+		TCPPort:          8888,
+		Name:             "kanade's server",
+		Version:          "Latest",
+		MaxConn:          1000,
+		MaxPackageSize:   1024,
+		WorkerPoolSize:   1000,
+		MaxWorkerTaskLen: 1000,
 	}
 
 	// 尝试从JSON读取配置

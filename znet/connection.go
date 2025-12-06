@@ -105,8 +105,13 @@ func (c *Connection) StartReader() {
 			conn: c,
 			msg:  msg,
 		}
-		// 从路由中，找到注册绑定的Conn对应的Router调用
-		go c.Router.DoMsgHandler(req)
+
+		if utils.GlobalObject.WorkerPoolSize > 0 {
+			// 已经开启工作池机制
+			c.Router.SendMsgToTaskQueue(req)
+		} else {
+			go c.Router.DoMsgHandler(req)
+		}
 	}
 
 }

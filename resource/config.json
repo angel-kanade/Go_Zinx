@@ -4,5 +4,7 @@
   "Name": "kanade's server",
   "Version": "tcp4",
   "MaxConn": 1000,
-  "MaxPackageSize": 1024 
+  "MaxPackageSize": 1024,
+  "WorkerPoolSize": 1000,
+  "MaxWorkerTaskLen": 100
 }
