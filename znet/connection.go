@@ -7,9 +7,13 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 )
 
 type Connection struct {
+	// 隶属Server
+	TCPServer zinterface.IServer
+
 	Conn *net.TCPConn
 
 	ConnID uint32
@@ -24,17 +28,48 @@ type Connection struct {
 
 	// 该链接处理的方法Router
 	Router zinterface.IMsgRouter
+
+	properties     map[string]any
+	propertiesLock sync.RWMutex
 }
 
-func NewConnection(conn *net.TCPConn, connID uint32, router zinterface.IMsgRouter) *Connection {
-	c := &Connection{
-		Conn:     conn,
-		ConnID:   connID,
-		isClosed: false,
-		ExitChan: make(chan bool, 1),
-		MsgChan:  make(chan []byte),
-		Router:   router,
+func (c *Connection) SetProperty(key string, value any) {
+	c.propertiesLock.Lock()
+	defer c.propertiesLock.Unlock()
+	c.properties[key] = value
+}
+
+func (c *Connection) GetProperty(key string) (any, error) {
+	c.propertiesLock.RLock()
+	defer c.propertiesLock.RUnlock()
+	if value, ok := c.properties[key]; ok {
+		return value, nil
+	} else {
+		return nil, errors.New("No Property Found!")
 	}
+}
+
+func (c *Connection) RemoveProperty(key string) {
+	c.propertiesLock.Lock()
+	defer c.propertiesLock.Unlock()
+	delete(c.properties, key)
+}
+
+func NewConnection(server zinterface.IServer, conn *net.TCPConn, connID uint32, router zinterface.IMsgRouter) *Connection {
+	c := &Connection{
+		TCPServer:      server,
+		Conn:           conn,
+		ConnID:         connID,
+		isClosed:       false,
+		ExitChan:       make(chan bool, 1),
+		MsgChan:        make(chan []byte),
+		Router:         router,
+		properties:     make(map[string]any),
+		propertiesLock: sync.RWMutex{},
+	}
+
+	// 将conn加入到ConnManager中
+	server.GetConnManager().AddConn(c)
 	return c
 }
 
@@ -119,6 +154,8 @@ func (c *Connection) Start() {
 	go c.StartReader()
 	// Write goroutine
 	go c.StartWriter()
+
+	c.TCPServer.CallOnConnStart(c)
 }
 
 func (c *Connection) Stop() {
@@ -130,9 +167,13 @@ func (c *Connection) Stop() {
 
 	close(c.MsgChan)
 	c.isClosed = true
+	c.TCPServer.CallOnConnStop(c)
 	c.Conn.Close()
 	c.ExitChan <- true
 	close(c.ExitChan)
+
+	c.TCPServer.GetConnManager().RemoteConn(c.ConnID)
+
 	return
 }
 

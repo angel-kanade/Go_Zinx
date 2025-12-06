@@ -11,4 +11,14 @@ type IServer interface {
 
 	// 路由功能：给当前的服务注册一个路由方法
 	AddHandler(msgId uint32, handler IHandler)
+
+	GetConnManager() IConnManager
+
+	SetOnConnStart(func(connection IConnection))
+
+	SetOnConnStop(func(connection IConnection))
+
+	CallOnConnStart(connection IConnection)
+
+	CallOnConnStop(connection IConnection)
 }

@@ -16,6 +16,35 @@ type Server struct {
 
 	// 当前的Server注册的Router
 	msgRouter zinterface.IMsgRouter
+
+	// connManager
+	connManager zinterface.IConnManager
+
+	// hook
+	OnConnStart func(conn zinterface.IConnection)
+	OnConnStop  func(conn zinterface.IConnection)
+}
+
+func (s *Server) SetOnConnStart(f func(connection zinterface.IConnection)) {
+	s.OnConnStart = f
+}
+
+func (s *Server) SetOnConnStop(f func(connection zinterface.IConnection)) {
+	s.OnConnStop = f
+}
+
+func (s *Server) CallOnConnStart(connection zinterface.IConnection) {
+	if s.OnConnStart != nil {
+		fmt.Println("=========Call OnConnStart()==========")
+		s.OnConnStart(connection)
+	}
+}
+
+func (s *Server) CallOnConnStop(connection zinterface.IConnection) {
+	if s.OnConnStop != nil {
+		fmt.Println("=========Call OnConnStop()===========")
+		s.OnConnStop(connection)
+	}
 }
 
 // Server添加一个Handler
@@ -52,8 +81,15 @@ func (s *Server) Start() {
 				continue
 			}
 
+			if s.connManager.Len() >= utils.GlobalObject.MaxConn {
+				//  给客户端响应超出最大连接
+				fmt.Println("Too Many Connections MaxConn =", utils.GlobalObject.MaxConn)
+				conn.Close()
+				continue
+			}
+
 			cid++
-			dealConn := NewConnection(conn, cid, s.msgRouter)
+			dealConn := NewConnection(s, conn, cid, s.msgRouter)
 
 			// 启动链接业务处理
 			go dealConn.Start()
@@ -72,17 +108,23 @@ func (s *Server) Serve() {
 }
 
 func (s *Server) Stop() {
-
+	fmt.Println("[STOP] Server's ConnManager is closing")
+	s.connManager.ClearConn()
 }
 
 func NewServer() zinterface.IServer {
 	s := &Server{
-		Name:      utils.GlobalObject.Name,
-		IPVersion: utils.GlobalObject.Version,
-		IP:        utils.GlobalObject.Host,
-		Port:      utils.GlobalObject.TCPPort,
-		msgRouter: NewMsgRouter(),
+		Name:        utils.GlobalObject.Name,
+		IPVersion:   utils.GlobalObject.Version,
+		IP:          utils.GlobalObject.Host,
+		Port:        utils.GlobalObject.TCPPort,
+		msgRouter:   NewMsgRouter(),
+		connManager: NewConnManager(),
 	}
 
 	return s
+}
+
+func (s *Server) GetConnManager() zinterface.IConnManager {
+	return s.connManager
 }
