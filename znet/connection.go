@@ -20,10 +20,10 @@ type Connection struct {
 	ExitChan chan bool
 
 	// 该链接处理的方法Router
-	Router zinterface.IHandler
+	Router zinterface.IMsgRouter
 }
 
-func NewConnection(conn *net.TCPConn, connID uint32, router zinterface.IHandler) *Connection {
+func NewConnection(conn *net.TCPConn, connID uint32, router zinterface.IMsgRouter) *Connection {
 	c := &Connection{
 		Conn:     conn,
 		ConnID:   connID,
@@ -84,11 +84,7 @@ func (c *Connection) StartReader() {
 			msg:  msg,
 		}
 		// 从路由中，找到注册绑定的Conn对应的Router调用
-		go func(req zinterface.IRequest) {
-			c.Router.PreHandle(req)
-			c.Router.Handle(req)
-			c.Router.PostHandle(req)
-		}(req)
+		go c.Router.DoMsgHandler(req)
 	}
 
 }

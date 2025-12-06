@@ -10,5 +10,5 @@ type IServer interface {
 	Stop()
 
 	// 路由功能：给当前的服务注册一个路由方法
-	AddHandler(router IHandler)
+	AddHandler(msgId uint32, handler IHandler)
 }

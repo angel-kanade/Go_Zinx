@@ -14,14 +14,14 @@ type Server struct {
 	IP        string
 	Port      int
 
-	// 当前的Server注册的链接处理业务
-	Handler zinterface.IHandler
+	// 当前的Server注册的Router
+	msgRouter zinterface.IMsgRouter
 }
 
 // Server添加一个Handler
-func (s *Server) AddHandler(handler zinterface.IHandler) {
-	s.Handler = handler
-	fmt.Println("Add Handler Success!")
+func (s *Server) AddHandler(msgId uint32, handler zinterface.IHandler) {
+	s.msgRouter.AddHandler(msgId, handler)
+	fmt.Println("Add router Success!")
 }
 
 func (s *Server) Start() {
@@ -53,7 +53,7 @@ func (s *Server) Start() {
 			}
 
 			cid++
-			dealConn := NewConnection(conn, cid, s.Handler)
+			dealConn := NewConnection(conn, cid, s.msgRouter)
 
 			// 启动链接业务处理
 			go dealConn.Start()
@@ -81,7 +81,7 @@ func NewServer() zinterface.IServer {
 		IPVersion: utils.GlobalObject.Version,
 		IP:        utils.GlobalObject.Host,
 		Port:      utils.GlobalObject.TCPPort,
-		Handler:   nil,
+		msgRouter: NewMsgRouter(),
 	}
 
 	return s
