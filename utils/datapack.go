@@ -2,13 +2,46 @@ package utils
 
 import (
 	"Go_Zinx/zinterface"
-	"Go_Zinx/znet"
 	"bytes"
 	"encoding/binary"
 	"errors"
 )
 
 type DataPack struct {
+}
+
+// message 是一个实现了zinterface.IMessage接口的结构体
+// 用于在utils包内部处理消息打包和解包
+// 避免直接依赖znet包的Message结构体
+// 实现zinterface.IMessage接口
+type message struct {
+	Id      uint32
+	DataLen uint32
+	Data    []byte
+}
+
+func (m *message) GetMsgId() uint32 {
+	return m.Id
+}
+
+func (m *message) GetDataLen() uint32 {
+	return m.DataLen
+}
+
+func (m *message) GetData() []byte {
+	return m.Data
+}
+
+func (m *message) SetMsgId(id uint32) {
+	m.Id = id
+}
+
+func (m *message) SetDataLen(len uint32) {
+	m.DataLen = len
+}
+
+func (m *message) SetData(data []byte) {
+	m.Data = data
 }
 
 func NewDataPackUtil() *DataPack {
@@ -40,7 +73,8 @@ func (dp *DataPack) Unpack(data []byte) (zinterface.IMessage, error) {
 	// 创建一个输入二进制数据的IO-Reader
 	dataBuff := bytes.NewReader(data)
 
-	msg := &znet.Message{}
+	// 创建一个实现了zinterface.IMessage接口的结构体
+	msg := &message{Id: 0, DataLen: 0, Data: nil}
 
 	// 先读Head-Len
 	if err := binary.Read(dataBuff, binary.LittleEndian, &msg.DataLen); err != nil {
