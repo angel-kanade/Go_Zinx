@@ -19,6 +19,9 @@ type Connection struct {
 	// 去告知链接已退出的channel
 	ExitChan chan bool
 
+	// 无缓冲管道
+	MsgChan chan []byte
+
 	// 该链接处理的方法Router
 	Router zinterface.IMsgRouter
 }
@@ -29,9 +32,28 @@ func NewConnection(conn *net.TCPConn, connID uint32, router zinterface.IMsgRoute
 		ConnID:   connID,
 		isClosed: false,
 		ExitChan: make(chan bool, 1),
+		MsgChan:  make(chan []byte),
 		Router:   router,
 	}
 	return c
+}
+
+func (c *Connection) StartWriter() {
+	defer fmt.Println("connID =", c.ConnID, "Writer stopped")
+	fmt.Println("Writer Goroutine is running...")
+
+	for {
+		select {
+		case data := <-c.MsgChan:
+			if _, err := c.Conn.Write(data); err != nil {
+				fmt.Println("Send data error", err)
+				return
+			}
+		case <-c.ExitChan:
+			// Reader 退出
+			return
+		}
+	}
 }
 
 func (c *Connection) StartReader() {
@@ -95,7 +117,8 @@ func (c *Connection) Start() {
 	// 启动当前链接的业务
 	// Read goroutine
 	go c.StartReader()
-	// TODO Write goroutine
+	// Write goroutine
+	go c.StartWriter()
 }
 
 func (c *Connection) Stop() {
@@ -105,8 +128,10 @@ func (c *Connection) Stop() {
 		return
 	}
 
+	close(c.MsgChan)
 	c.isClosed = true
 	c.Conn.Close()
+	c.ExitChan <- true
 	close(c.ExitChan)
 	return
 }
@@ -136,10 +161,7 @@ func (c *Connection) SendMsg(msgId uint32, data []byte) error {
 		return errors.New("pack error msg")
 	}
 
-	if _, err := c.Conn.Write(binaryMsg); err != nil {
-		fmt.Println("Write msg error msgId =", msgId)
-		return errors.New("conn Write error")
-	}
+	c.MsgChan <- binaryMsg
 
 	return nil
 }
