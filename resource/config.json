@@ -4,5 +4,7 @@
   "Name": "kanade's server",
   "Version": "tcp4",
   "MaxConn": 1000,
-  "MaxPackageSize": 1024 
+  "MaxPackageSize": 1024,
+  "LogLevel": 1,
+  "LogFile": "logs/zinx.log"
 }

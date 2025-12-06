@@ -5,6 +5,7 @@ import (
 	"Go_Zinx/zinterface"
 	"fmt"
 	"net"
+	"time"
 )
 
 // IServer的接口实现，定义一个Server的服务器模块
@@ -23,6 +24,12 @@ type Server struct {
 	// hook
 	OnConnStart func(conn zinterface.IConnection)
 	OnConnStop  func(conn zinterface.IConnection)
+
+	// 心跳检测器
+	HeartbeatChecker *HeartbeatChecker
+
+	// 退出通道
+	exitChan chan struct{}
 }
 
 func (s *Server) SetOnConnStart(f func(connection zinterface.IConnection)) {
@@ -35,16 +42,20 @@ func (s *Server) SetOnConnStop(f func(connection zinterface.IConnection)) {
 
 func (s *Server) CallOnConnStart(connection zinterface.IConnection) {
 	if s.OnConnStart != nil {
-		fmt.Println("=========Call OnConnStart()==========")
+		utils.GlobalLogger.Info("=========Call OnConnStart()==========")
 		s.OnConnStart(connection)
 	}
+	// 更新性能指标：连接建立
+	utils.GlobalMetrics.IncrementConnectionsTotal()
 }
 
 func (s *Server) CallOnConnStop(connection zinterface.IConnection) {
 	if s.OnConnStop != nil {
-		fmt.Println("=========Call OnConnStop()===========")
+		utils.GlobalLogger.Info("=========Call OnConnStop()===========")
 		s.OnConnStop(connection)
 	}
+	// 更新性能指标：连接关闭
+	utils.GlobalMetrics.DecrementConnectionsCurrent()
 }
 
 // Server添加一个Handler
@@ -54,22 +65,27 @@ func (s *Server) AddHandler(msgId uint32, handler zinterface.IHandler) {
 }
 
 func (s *Server) Start() {
-	fmt.Printf("[Start] Server Listener at Address: %s:%d\n", s.IP, s.Port)
+	utils.GlobalLogger.Info("[Start] Server Listener at Address: %s:%d", s.IP, s.Port)
 
 	// 开辟一个 go 协程处理服务器启动，防止阻塞
 	go func() {
 		// 1. 获取一个TCP的Addr:Port
 		addr, err := net.ResolveTCPAddr(s.IPVersion, fmt.Sprintf("%s:%d", s.IP, s.Port))
 		if err != nil {
-			fmt.Println("Resolve TCP Address error", err)
-		}
-		// 2. 监听
-		listener, err := net.ListenTCP(s.IPVersion, addr)
-		if err != nil {
-			fmt.Println("Start Server Listener failed", err)
+			utils.GlobalLogger.Error("Resolve TCP Address error: %v", err)
+			return
 		}
 
-		fmt.Println("start Zinx Server success", s.Name, "Listening")
+		// 普通监听
+		listener, err := net.ListenTCP(s.IPVersion, addr)
+		if err != nil {
+			utils.GlobalLogger.Error("Start Server Listener failed: %v", err)
+			return
+		}
+
+		defer listener.Close()
+
+		utils.GlobalLogger.Info("start Zinx Server success %s Listening", s.Name)
 
 		var cid uint32
 		cid = 0
@@ -77,13 +93,13 @@ func (s *Server) Start() {
 		for {
 			conn, err := listener.AcceptTCP()
 			if err != nil {
-				fmt.Println("Accept Error", err)
+				utils.GlobalLogger.Error("Accept Error: %v", err)
 				continue
 			}
 
 			if s.connManager.Len() >= utils.GlobalObject.MaxConn {
 				//  给客户端响应超出最大连接
-				fmt.Println("Too Many Connections MaxConn =", utils.GlobalObject.MaxConn)
+				utils.GlobalLogger.Warn("Too Many Connections MaxConn = %d", utils.GlobalObject.MaxConn)
 				conn.Close()
 				continue
 			}
@@ -91,11 +107,14 @@ func (s *Server) Start() {
 			cid++
 			dealConn := NewConnection(s, conn, cid, s.msgRouter)
 
+			// 将连接添加到心跳检测
+			s.HeartbeatChecker.AddConnection(dealConn)
+			dealConn.SetProperty("HeartbeatChecker", s.HeartbeatChecker)
+
 			// 启动链接业务处理
 			go dealConn.Start()
 		}
 	}()
-
 }
 
 func (s *Server) Serve() {
@@ -108,19 +127,59 @@ func (s *Server) Serve() {
 }
 
 func (s *Server) Stop() {
-	fmt.Println("[STOP] Server's ConnManager is closing")
+	utils.GlobalLogger.Info("[STOP] Server's ConnManager is closing")
 	s.connManager.ClearConn()
+
+	// 停止心跳检测器
+	if s.HeartbeatChecker != nil {
+		s.HeartbeatChecker.Stop()
+	}
+
+	// 通知退出
+	close(s.exitChan)
+}
+
+// startMetricsReporter 启动性能指标报告器
+func (s *Server) startMetricsReporter() {
+	go func() {
+		ticker := time.NewTicker(60 * time.Second) // 每分钟报告一次
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				// 输出性能报告
+				utils.GlobalLogger.Info(utils.GlobalMetrics.GetMetricsReport())
+			case <-s.exitChan:
+				return
+			}
+		}
+	}()
 }
 
 func NewServer() zinterface.IServer {
+	// 初始化性能指标收集器
+	utils.InitMetrics()
+	// 创建心跳检测器，每5秒检查一次，超时30秒
+	heartbeatChecker := NewHeartbeatChecker(5*time.Second, 30*time.Second)
+	heartbeatChecker.Start()
+
 	s := &Server{
-		Name:        utils.GlobalObject.Name,
-		IPVersion:   utils.GlobalObject.Version,
-		IP:          utils.GlobalObject.Host,
-		Port:        utils.GlobalObject.TCPPort,
-		msgRouter:   NewMsgRouter(),
-		connManager: NewConnManager(),
+		Name:             utils.GlobalObject.Name,
+		IPVersion:        "tcp4",
+		IP:               utils.GlobalObject.Host,
+		Port:             utils.GlobalObject.TCPPort,
+		msgRouter:        NewMsgRouter(),
+		connManager:      NewConnManager(),
+		HeartbeatChecker: heartbeatChecker,
+		exitChan:         make(chan struct{}),
 	}
+
+	// 添加心跳包处理
+	s.AddHandler(0, &HeartbeatHandler{})
+
+	// 启动性能指标报告器
+	s.startMetricsReporter()
 
 	return s
 }
