@@ -4,6 +4,14 @@ import (
 	"Go_Zinx/zinterface"
 )
 
+// WorkerPoolConfig 工作池配置
+type WorkerPoolConfig struct {
+	CoreWorkers  uint32 // 核心工作线程数
+	MaxWorkers   uint32 // 最大工作线程数
+	QueueSize    uint32 // 请求队列大小
+	IdleTimeout  uint32 // 非核心工作线程空闲超时时间（秒）
+}
+
 // 存储配置参数类
 type GlobalObj struct {
 	TCPServer      zinterface.IServer
@@ -16,6 +24,8 @@ type GlobalObj struct {
 	// 日志相关配置
 	LogLevel int    // 日志级别
 	LogFile  string // 日志文件路径
+	// 工作池配置
+	WorkerPool WorkerPoolConfig
 }
 
 var GlobalObject *GlobalObj
@@ -39,6 +49,13 @@ func init() {
 		// 日志默认配置
 		LogLevel: INFO,
 		LogFile:  "",
+		// 工作池默认配置
+		WorkerPool: WorkerPoolConfig{
+			CoreWorkers: 4,
+			MaxWorkers: 16,
+			QueueSize: 1000,
+			IdleTimeout: 30,
+		},
 	}
 
 	// 尝试从JSON读取配置

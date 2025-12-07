@@ -5,6 +5,7 @@ import (
 	"Go_Zinx/zinterface"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"time"
 )
 
@@ -27,6 +28,9 @@ type Server struct {
 
 	// 心跳检测器
 	HeartbeatChecker *HeartbeatChecker
+
+	// 工作池
+	WorkerPool *WorkerPool
 
 	// 退出通道
 	exitChan chan struct{}
@@ -87,8 +91,8 @@ func (s *Server) Start() {
 
 		utils.GlobalLogger.Info("start Zinx Server success %s Listening", s.Name)
 
-		var cid uint32
-		cid = 0
+		// 使用原子操作确保ConnID分配的并发安全
+		var cid uint32 = 0
 		// 3. 阻塞等待客户端连接，处理业务
 		for {
 			conn, err := listener.AcceptTCP()
@@ -104,8 +108,9 @@ func (s *Server) Start() {
 				continue
 			}
 
-			cid++
-			dealConn := NewConnection(s, conn, cid, s.msgRouter)
+			// 使用原子操作递增ConnID
+			currentCID := atomic.AddUint32(&cid, 1)
+			dealConn := NewConnection(s, conn, currentCID, s.msgRouter)
 
 			// 将连接添加到心跳检测
 			s.HeartbeatChecker.AddConnection(dealConn)
@@ -133,6 +138,11 @@ func (s *Server) Stop() {
 	// 停止心跳检测器
 	if s.HeartbeatChecker != nil {
 		s.HeartbeatChecker.Stop()
+	}
+
+	// 停止工作池
+	if s.WorkerPool != nil {
+		s.WorkerPool.Stop()
 	}
 
 	// 通知退出
@@ -164,6 +174,10 @@ func NewServer() zinterface.IServer {
 	heartbeatChecker := NewHeartbeatChecker(5*time.Second, 30*time.Second)
 	heartbeatChecker.Start()
 
+	// 创建工作池，使用配置文件中的参数
+	workerPool := NewWorkerPool()
+	workerPool.Start()
+
 	s := &Server{
 		Name:             utils.GlobalObject.Name,
 		IPVersion:        "tcp4",
@@ -172,6 +186,7 @@ func NewServer() zinterface.IServer {
 		msgRouter:        NewMsgRouter(),
 		connManager:      NewConnManager(),
 		HeartbeatChecker: heartbeatChecker,
+		WorkerPool:       workerPool,
 		exitChan:         make(chan struct{}),
 	}
 
@@ -186,4 +201,9 @@ func NewServer() zinterface.IServer {
 
 func (s *Server) GetConnManager() zinterface.IConnManager {
 	return s.connManager
+}
+
+// GetWorkerPool 获取工作池
+func (s *Server) GetWorkerPool() interface{} {
+	return s.WorkerPool
 }

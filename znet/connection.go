@@ -137,12 +137,21 @@ func (c *Connection) StartReader() {
 		}
 		// 记录消息处理开始时间
 		startTime := time.Now()
-		// 直接使用goroutine处理消息
-		go func() {
-			c.Router.DoMsgHandler(req)
+
+		// 获取工作池
+		if server, ok := c.TCPServer.(*Server); ok && server.WorkerPool != nil {
+			// 使用工作池处理消息
+			server.WorkerPool.AddRequest(req)
 			// 记录消息处理时间
 			utils.GlobalMetrics.RecordMessageHandlingTime(time.Since(startTime))
-		}()
+		} else {
+			// 降级方案：直接使用goroutine处理消息
+			go func() {
+				c.Router.DoMsgHandler(req)
+				// 记录消息处理时间
+				utils.GlobalMetrics.RecordMessageHandlingTime(time.Since(startTime))
+			}()
+		}
 	}
 }
 
@@ -210,4 +219,9 @@ func (c *Connection) SendMsg(msgId uint32, data []byte) error {
 	c.MsgChan <- binaryMsg
 
 	return nil
+}
+
+// GetRouter 获取连接的路由
+func (c *Connection) GetRouter() zinterface.IMsgRouter {
+	return c.Router
 }

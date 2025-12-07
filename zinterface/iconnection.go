@@ -26,4 +26,7 @@ type IConnection interface {
 	GetProperty(key string) (any, error)
 
 	RemoveProperty(key string)
+
+	// 获取路由
+	GetRouter() IMsgRouter
 }

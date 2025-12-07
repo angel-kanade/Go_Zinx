@@ -21,4 +21,7 @@ type IServer interface {
 	CallOnConnStart(connection IConnection)
 
 	CallOnConnStop(connection IConnection)
+	
+	// 获取工作池
+	GetWorkerPool() interface{}
 }

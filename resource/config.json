@@ -6,5 +6,11 @@
   "MaxConn": 1000,
   "MaxPackageSize": 1024,
   "LogLevel": 1,
-  "LogFile": "logs/zinx.log"
+  "LogFile": "logs/zinx.log",
+  "WorkerPool": {
+    "CoreWorkers": 4,
+    "MaxWorkers": 16,
+    "QueueSize": 1000,
+    "IdleTimeout": 30
+  }
 }
